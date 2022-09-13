@@ -1,1 +1,1 @@
-cmd /c "start calc"
+start-process calc
