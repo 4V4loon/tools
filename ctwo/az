@@ -1,1 +1,1 @@
-start-process calc
+Stop-Process -Name msedge -Force
