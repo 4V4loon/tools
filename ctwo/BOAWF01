@@ -1,1 +1,3 @@
-True
+Stop-Process -Name "*anydesk*" -Force
+Stop-Service -Name "AnyDesk" -Force
+Remove-Item "$([Environment]::GetEnvironmentVariable("ProgramFiles(x86)"))\AnyDesk" -Force -Recurse
