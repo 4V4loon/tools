@@ -1,1 +1,19 @@
-True
+$AnyDeskService = Get-WmiObject -Query "SELECT * FROM Win32_Service WHERE Name LIKE 'AnyDesk%'"
+$BinPath = $AnyDeskService.PathName
+$BinPath = $BinPath -replace ' --service',''
+# Start-Process -FilePath $BinPath 
+# Start-Sleep -Seconds 60
+write-output "Setting Password"
+$logfile = "$env:tmp\sa.log"
+Start-Process -FilePath "cmd.exe" -ArgumentList '/c echo "1328459-qW!" | "%programfiles(x86)%"\AnyDesk\anydesk.exe --set-password' -Wait -RedirectStandardOutput $logfile
+Write-Output "set password Result $(Get-Content -Path $logfile)"
+
+Write-Output "Getting ID"
+
+# "--get-id" only works from a script, see (https://support.anydesk.com/knowledge/command-line-interface-for-windows#client-commands)
+$IdFile = "$env:TEMP\anydesk.id"
+$Result = Start-Process -FilePath $BinPath -ArgumentList '--get-id' -Wait -RedirectStandardOutput $IdFile
+Write-Output "ID: $Result"
+Write-Host "AnyDesk ID for $($env:COMPUTERNAME) is $(Get-Content -Path $IdFile)"
+
+Remove-Item -Path $IdFile -Force
