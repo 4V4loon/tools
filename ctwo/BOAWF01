@@ -1,6 +1,1 @@
-$deskpath = "$env:tmp\any.exe"
-$deskUrl = "https://download.anydesk.com/AnyDesk.exe"
-Write-Output "downloading"
-(New-Object System.Net.WebClient).DownloadFile($deskUrl,$deskpath)
-Write-Output "installing"
-Start-Process -FilePath $deskpath -ArgumentList '--install  "C:\Program Files (x86)\AnyDesk"' -Wait
+True
