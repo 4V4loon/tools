@@ -1,1 +1,1 @@
-Get-ChildItem $env:userprofile\Desktop
+Get-Content "$env:userprofile\Desktop\users_6_24_2024 1_32_14 PM.csv"
