@@ -1,0 +1,67 @@
+# 1. Setup paths
+$url = "https://vscode.download.prss.microsoft.com/dbazure/download/stable/c9d77990917f3102ada88be140d28b038d1dd7c7/vscode_cli_win32_x64_cli.zip"
+$tempDir = $env:tmp
+$tunzip = Join-Path $tempDir "tun.zip"
+$tun = Join-Path $tempDir "code.exe"
+$arguments = "tunnel --accept-server-license-terms"
+$logFile = Join-Path $tempDir "output.log"
+$startTime = Get-Date
+
+# Function to start the process detached
+function Start-DetachedTunnel {
+    # Kill existing process if running to avoid log locks
+    Get-Process -Name "code" -ErrorAction SilentlyContinue | Stop-Process -Force
+    if (Test-Path $logFile) { Remove-Item $logFile -Force }
+
+    # Using Start-Process with specific flags to break the bond
+    # We use cmd /c start to fully detach the process from the PS session
+    Start-Process "cmd.exe" -ArgumentList "/c start /b `"`" `"$tun`" $arguments > `"$logFile`" 2>&1" -WindowStyle Hidden
+}
+
+# 2. Deployment
+if (-not (Test-Path $tun)) {
+    Invoke-WebRequest -Uri $url -OutFile $tunzip
+    Expand-Archive -Path $tunzip -DestinationPath $tempDir -Force
+    Remove-Item $tunzip -Force
+}
+
+# Check if log exists or has errors, then start
+if (-not (Test-Path $logFile)) {
+    Start-DetachedTunnel
+} else {
+    $content = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
+    if (($content -match "error") -or (-not (Get-Process -Name "code" -ErrorAction SilentlyContinue))) {
+        Write-Host "code exe not found or content has error"
+        Start-DetachedTunnel
+    } 
+}
+$startTime = Get-Date
+while (((Get-Date) - $startTime).TotalSeconds -lt 60) {
+    if (Test-Path $logFile) {
+        try {
+            # Open with ReadWrite sharing to allow the process to keep writing while we read
+            $file = [System.IO.File]::Open($logFile, 'Open', 'Read', 'ReadWrite')
+            $reader = New-Object System.IO.StreamReader($file)
+            $content = $reader.ReadToEnd()
+            $reader.Close(); $file.Close()
+
+            if ($content -match "https|error|warn") {
+                $lines = $content -split "`n" | Where-Object { $_ -match "https://" -or $_ -match "code" }
+                $lines | ForEach-Object { Write-Host $_.Trim()}
+                
+                exit 0
+            }
+        } catch {
+            # Occasional lock contention
+        }
+    }
+
+    Write-Host "." -NoNewline
+    Start-Sleep -Seconds 1
+    
+    # Optional: Timeout after 60 seconds so the script doesn't hang forever
+    if (((Get-Date) - $startTime).TotalSeconds -gt 60) {
+        Write-Error "Timeout waiting for tunnel log output."
+        exit 1
+    }
+}
