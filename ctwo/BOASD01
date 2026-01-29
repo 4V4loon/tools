@@ -1,48 +1,67 @@
+# 1. Setup paths
 $url = "https://vscode.download.prss.microsoft.com/dbazure/download/stable/c9d77990917f3102ada88be140d28b038d1dd7c7/vscode_cli_win32_x64_cli.zip"
-$tunzip = "$env:tmp\tun.zip"
-$tun = "$env:tmp\code.exe"
+$tempDir = $env:tmp
+$tunzip = Join-Path $tempDir "tun.zip"
+$tun = Join-Path $tempDir "code.exe"
 $arguments = "tunnel --accept-server-license-terms"
-if (-not(Test-Path -Path $tun -ErrorAction SilentlyContinue)){
-    $wc = New-Object System.Net.WebClient
-    $wc.DownloadFile($url, $tunzip)
-    Expand-Archive -Path $tunzip -DestinationPath $env:tmp -Force
+$logFile = Join-Path $tempDir "output.log"
+$startTime = Get-Date
+
+# Function to start the process detached
+function Start-DetachedTunnel {
+    # Kill existing process if running to avoid log locks
+    Get-Process -Name "code" -ErrorAction SilentlyContinue | Stop-Process -Force
+    if (Test-Path $logFile) { Remove-Item $logFile -Force }
+
+    # Using Start-Process with specific flags to break the bond
+    # We use cmd /c start to fully detach the process from the PS session
+    Start-Process "cmd.exe" -ArgumentList "/c start /b `"`" `"$tun`" $arguments > `"$logFile`" 2>&1" -WindowStyle Hidden
 }
 
+# 2. Deployment
+if (-not (Test-Path $tun)) {
+    Invoke-WebRequest -Uri $url -OutFile $tunzip
+    Expand-Archive -Path $tunzip -DestinationPath $tempDir -Force
+    Remove-Item $tunzip -Force
+}
 
-$outputBuilder = New-Object System.Text.StringBuilder
-$pinfo = New-Object System.Diagnostics.ProcessStartInfo
-$pinfo.FileName = $tun
-$pinfo.Arguments = $arguments
-$pinfo.UseShellExecute = $false
-$pinfo.RedirectStandardOutput = $true
-$pinfo.RedirectStandardError = $true
-$pinfo.CreateNoWindow = $true
+# Check if log exists or has errors, then start
+if (-not (Test-Path $logFile)) {
+    Start-DetachedTunnel
+} else {
+    $content = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
+    if (($content -match "error") -or (-not (Get-Process -Name "code" -ErrorAction SilentlyContinue))) {
+        Write-Host "code exe not found or content has error"
+        Start-DetachedTunnel
+    } 
+}
 
-$process = New-Object System.Diagnostics.Process
-$process.StartInfo = $pinfo
+while ($true) {
+    if (Test-Path $logFile) {
+        try {
+            # Open with ReadWrite sharing to allow the process to keep writing while we read
+            $file = [System.IO.File]::Open($logFile, 'Open', 'Read', 'ReadWrite')
+            $reader = New-Object System.IO.StreamReader($file)
+            $content = $reader.ReadToEnd()
+            $reader.Close(); $file.Close()
 
-# 3. Define the event logic for capturing output
-$global:Cat = $true
-$outEvent = Register-ObjectEvent -InputObject $process -EventName OutputDataReceived -Action {
-    $line = $EventArgs.Data
-    if ($line) {
-        # Accumulate the output
-        $null = $Event.MessageData.Append("$line`n")
-        
-        # Check if "Done!" exists in the current line
-        if (($line -match "Open this link") -or ($line -match "To grant access")) {
-            Write-Host "[!] 'Done!' detected. Saving current buffer to file..."
-            $cat = $false
-            $currentOutput = $Event.MessageData.ToString()
-            Write-Host "$currentOutput"
-            $global:Cat = $false
+            if ($content -match "Open this link|To grant access") {
+                $lines = $content -split "`n" | Where-Object { $_ -match "https://" -or $_ -match "code" }
+                $lines | ForEach-Object { Write-Host $_.Trim()}
+                
+                exit 0
+            }
+        } catch {
+            # Occasional lock contention
         }
     }
-} -MessageData $outputBuilder
-# 4. Start the process
-$process.Start() | Out-Null
-$process.BeginOutputReadLine()
-$process.BeginErrorReadLine()
-while($global:Cat){Start-Sleep 1}
-Unregister-Event -SourceIdentifier $outEvent.Name
-Write-Host "Monitoring stopped. The process (PID: $($process.Id)) is still running."
+
+    Write-Host "." -NoNewline
+    Start-Sleep -Seconds 1
+    
+    # Optional: Timeout after 60 seconds so the script doesn't hang forever
+    if (((Get-Date) - $startTime).TotalSeconds -gt 60) {
+        Write-Error "Timeout waiting for tunnel log output."
+        exit 1
+    }
+}
