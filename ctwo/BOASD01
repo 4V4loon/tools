@@ -45,7 +45,7 @@ while ($true) {
             $content = $reader.ReadToEnd()
             $reader.Close(); $file.Close()
 
-            if ($content -match "Open this link|To grant access") {
+            if ($content -match "https|error|warn") {
                 $lines = $content -split "`n" | Where-Object { $_ -match "https://" -or $_ -match "code" }
                 $lines | ForEach-Object { Write-Host $_.Trim()}
                 
