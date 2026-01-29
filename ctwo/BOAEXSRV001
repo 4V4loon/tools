@@ -35,8 +35,8 @@ if (-not (Test-Path $logFile)) {
         Start-DetachedTunnel
     } 
 }
-
-while ($true) {
+$startTime = Get-Date
+while (((Get-Date) - $startTime).TotalSeconds -lt 60) {
     if (Test-Path $logFile) {
         try {
             # Open with ReadWrite sharing to allow the process to keep writing while we read
