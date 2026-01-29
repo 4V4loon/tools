@@ -46,8 +46,7 @@ while (((Get-Date) - $startTime).TotalSeconds -lt 60) {
             $reader.Close(); $file.Close()
 
             if ($content -match "grant|browser|error|warn") {
-                $lines = $content -split "`n" | Where-Object { $_ -match "https://" -or $_ -match "code" }
-                $lines | ForEach-Object { Write-Host $_.Trim()}
+                Write-Host $content
                 
                 exit 0
             }
