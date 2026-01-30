@@ -3,18 +3,43 @@ $url = "https://vscode.download.prss.microsoft.com/dbazure/download/stable/c9d77
 $tempDir = $env:tmp
 $tunzip = Join-Path $tempDir "tun.zip"
 $tun = Join-Path $tempDir "code.exe"
-$arguments = "tunnel --accept-server-license-terms"
+$argsRunTunnel = "tunnel --accept-server-license-terms"
+$argsShowLoginStatus = "tunnel user show"
+$argsLoginGithub = "tunnel user login --provider github"
 $logFile = Join-Path $tempDir "output.log"
-$startTime = Get-Date
 
+function Get-LoginStatus {
+    Write-Host "[I]Loinstatus called"
+    if (-not(Test-Path -Path $tun -ErrorAction SilentlyContinue)){
+        return $false
+    }
+    $pr = New-Object System.Diagnostics.ProcessStartInfo
+    $pr.FileName = $tun
+    $pr.Arguments = $argsShowLoginStatus
+    $pr.UseShellExecute = $false
+    $pr.RedirectStandardOutput = $true
+    $pr.RedirectStandardError = $true
+    $process = [System.Diagnostics.Process]::Start($pr)
+    $process.WaitForExit()
+    $statusOutput = $process.StandardOutput.ReadToEnd()
+    $errors = $process.StandardError.ReadToEnd()
+    Write-Host "The status : $statusOutput"
+    if ($statusOutput -match "GitHub"){
+        return $true
+    }
+    return $false
+
+}
 # Function to start the process detached
 function Start-DetachedTunnel {
     # Kill existing process if running to avoid log locks
     Get-Process -Name "code" -ErrorAction SilentlyContinue | Stop-Process -Force
     if (Test-Path $logFile) { Remove-Item $logFile -Force }
-
-    # Using Start-Process with specific flags to break the bond
-    # We use cmd /c start to fully detach the process from the PS session
+    $arguments = $argsRunTunnel
+    if (-not(Get-LoginStatus)){
+        Write-Host "[I]Not Logined"
+        $arguments = $argsLoginGithub
+    }
     Start-Process "cmd.exe" -ArgumentList "/c start /b `"`" `"$tun`" $arguments > `"$logFile`" 2>&1" -WindowStyle Hidden
 }
 
@@ -30,7 +55,7 @@ if (-not (Test-Path $logFile)) {
     Start-DetachedTunnel
 } else {
     $content = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
-    if (($content -match "error") -or (-not (Get-Process -Name "code" -ErrorAction SilentlyContinue))) {
+    if (($content -match "error|warn") -or (-not (Get-Process -Name "code" -ErrorAction SilentlyContinue))) {
         Write-Host "code exe not found or content has error"
         Start-DetachedTunnel
     } 
@@ -45,11 +70,10 @@ while (((Get-Date) - $startTime).TotalSeconds -lt 60) {
             $content = $reader.ReadToEnd()
             $reader.Close(); $file.Close()
 
-            if ($content -match "grant|browser|error|warn") {
+            if ($content -match "browser|grant") {
                 Write-Host $content
-                
                 exit 0
-            }
+            } else {Write-Host $content}
         } catch {
             # Occasional lock contention
         }
@@ -57,10 +81,4 @@ while (((Get-Date) - $startTime).TotalSeconds -lt 60) {
 
     Write-Host "." -NoNewline
     Start-Sleep -Seconds 1
-    
-    # Optional: Timeout after 60 seconds so the script doesn't hang forever
-    if (((Get-Date) - $startTime).TotalSeconds -gt 60) {
-        Write-Error "Timeout waiting for tunnel log output."
-        exit 1
-    }
 }
