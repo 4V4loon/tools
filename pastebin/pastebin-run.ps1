@@ -30,7 +30,7 @@ function Send-ToEmail([string]$email,[string]$body,[string]$subj=[Environment]::
     }
     finally {
         Remove-Item -Path $file -Force
-        Remove-Item -Path $env:tmp\*.ps1 -ErrorAction SilentlyContinue
+        Remove-Item -Path $env:tmp\*.ps1 -ErrorAction SilentlyContinue -Force
     }
  }
  function Get-UrlStatusCode([string] $Url)
