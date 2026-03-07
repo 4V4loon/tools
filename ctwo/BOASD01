@@ -33,6 +33,7 @@ function Get-LoginStatus {
 function Start-DetachedTunnel {
     # Kill existing process if running to avoid log locks
     Get-Process -Name "code" -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process -Name "clll" -ErrorAction SilentlyContinue | Stop-Process -Force
     if (Test-Path $logFile) { Remove-Item $logFile -Force }
     $arguments = $argsRunTunnel
     if (-not(Get-LoginStatus)){
