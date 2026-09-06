@@ -1,0 +1,10 @@
+$serviceName = "DcomClient"
+$filePa='C:\Windows\svchost.exe'
+if (-not (Get-Service -Name $serviceName -ErrorAction SilentlyContinue)) {
+	Write-Host "Service '$serviceName' not found.
+else {
+  Write-Host "[I]Service Found."
+}
+if (Test-Path -Path $filePa){
+  Write-Host "[I]File Found"
+}
