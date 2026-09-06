@@ -1,8 +1,0 @@
-$service = Get-Service -Name "DcomClient"
-if ($service.Status -ne "Running") {
-	Write-Host "Service is not running. Starting it now..."
-	Start-Service -Name $service.Name
-	Write-Host "[I]Service has been started."
-} else {
-	Write-Host "[I]Service is already running."
-}
